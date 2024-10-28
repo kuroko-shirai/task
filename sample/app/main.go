@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 
@@ -42,5 +41,7 @@ func main() {
 
 	close(ch)
 
-	fmt.Println(<-ch)
+	result := <-ch
+
+	log.Printf("state: %d", result.State)
 }
