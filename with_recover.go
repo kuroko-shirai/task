@@ -10,15 +10,17 @@ type withRecover struct {
 
 	sem chan token
 
-	errOnce sync.Once
-	err     error
+	err error
 
 	recover rT
+
+	mu sync.Mutex
 }
 
 func WithRecover(recover rT) *withRecover {
 	return &withRecover{
 		recover: recover,
+		mu:      sync.Mutex{},
 	}
 }
 
@@ -37,15 +39,15 @@ func (g *withRecover) Do(h hT, rs ...rT) {
 			if r := recover(); r != nil {
 				cr(r)
 
-				g.errOnce.Do(func() {
-					str, _ := r.(error)
+				str, _ := r.(error)
+				g.lock(func() {
 					g.err = errors.Join(g.err, str)
 				})
 			}
 		}()
 
 		if err := h(); err != nil {
-			g.errOnce.Do(func() {
+			g.lock(func() {
 				g.err = errors.Join(g.err, err)
 			})
 		}
@@ -62,5 +64,15 @@ func (g *withRecover) done() {
 func (g *withRecover) Wait() error {
 	g.wg.Wait()
 
-	return g.err
+	g.mu.Lock()
+	err := g.err
+	g.mu.Unlock()
+
+	return err
+}
+
+func (g *withRecover) lock(f func()) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	f()
 }

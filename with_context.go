@@ -11,11 +11,12 @@ type withContext struct {
 
 	sem chan token
 
-	errOnce sync.Once
-	err     error
+	err error
 
 	recover  rT
 	canceler cT
+
+	mu sync.Mutex
 }
 
 func WithContext(
@@ -27,6 +28,7 @@ func WithContext(
 	return &withContext{
 		recover:  recover,
 		canceler: canceler,
+		mu:       sync.Mutex{},
 	}, ctx
 }
 
@@ -55,15 +57,15 @@ func (g *withContext) Do(h hT, rs ...rT) {
 			if r := recover(); r != nil {
 				cr(r)
 
-				g.errOnce.Do(func() {
-					str, _ := r.(error)
+				str, _ := r.(error)
+				g.lock(func() {
 					g.err = errors.Join(g.err, str)
 				})
 			}
 		}()
 
 		if err := h(); err != nil {
-			g.errOnce.Do(func() {
+			g.lock(func() {
 				g.err = errors.Join(g.err, err)
 			})
 		}
@@ -84,4 +86,10 @@ func (g *withContext) Wait() error {
 	}
 
 	return g.err
+}
+
+func (g *withContext) lock(f func()) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	f()
 }
