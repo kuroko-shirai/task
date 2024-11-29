@@ -46,7 +46,12 @@ func (g *withContext) Wait() error {
 	return g.err
 }
 
-func (g *withContext) Do(handler func() error) {
+func (g *withContext) Do(h func() error, r ...func(f any, args ...any)) {
+	cr := g.recover
+	if r != nil {
+		cr = r[0]
+	}
+
 	if g.sem != nil {
 		g.sem <- token{}
 	}
@@ -58,7 +63,7 @@ func (g *withContext) Do(handler func() error) {
 			g.done()
 
 			if r := recover(); r != nil {
-				g.recover(r)
+				cr(r)
 
 				str, _ := r.(error)
 
@@ -68,7 +73,7 @@ func (g *withContext) Do(handler func() error) {
 			}
 		}()
 
-		if err := handler(); err != nil {
+		if err := h(); err != nil {
 			g.errOnce.Do(func() {
 				g.mu.Lock()
 				g.err = errors.Join(g.err, err)

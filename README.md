@@ -76,3 +76,78 @@ if err := g.Wait(); err != nil {
 	...
 }
 ```
+
+Пользователь может передавать аргументы в обработчик,
+указавая сигнатуру функтора `h` внутри метода `Do`.
+
+```go
+arg := 1
+g.Do(func(arg int) func() error {
+	return func() error {
+		...
+	}
+}(arg))
+```
+
+Также пользователь может вызывать не предустановленные
+обработчики паники, если у вас есть появится такая
+необходимость. Это может оказаться полезным, если нужно
+перехватить конкретный момент выполнения запроса, либо
+залогировать аргументы, при которых функтор `h` дает сбой.
+
+```go
+g.Do(func() func() error {
+	return func() error {
+		...
+	}
+}(), func(recovery any) {
+	log.Println("a custom handler of panic:", recovery)
+})
+```
+
+### With Context
+
+Также как и в пакете `errgroup` вы можете определять
+самостоятельную работу с контекстом. Например, мы можем
+определить функцию `worker(context.Context, string) error`,
+которая запускает панику для одного обработчика, а также
+обрабатывает состояния контекста через `select`.
+
+```go
+func worker(ctx context.Context, name string) error {
+	log.Println(name, "started")
+
+	if name == "worker-2" {
+		panic(errors.New("worker-2 got panic"))
+	}
+
+	select {
+	case <-ctx.Done():
+		log.Printf("worker %s stopped by context\n", name)
+		return ctx.Err()
+	case <-time.After(2 * time.Second):
+		log.Printf("worker %s finished\n", name)
+		return nil
+	}
+}
+```
+
+Как вы можете помнить, пакет `errgroup` не дает возможности
+сохранить состояние всех ошибок, завершая работу группы при
+наличии проблемы. Пакет `task` позволяет сохраняет состояния
+ошибок обработчиков и даже при возникновении паники
+позволяет пользователю определить сценарии восстановления
+системы без завершения работы микросервиса. Чтобы подключить
+контекст создайте группу задач с сценарием восстановления.
+
+```go
+ctx, cancel := context.WithCancel(context.Background())
+g, ctx := task.WithContext(
+	ctx,
+	func(recovery any) {
+		log.Println("panic:", recovery)
+	},
+)
+```
+
+Затем

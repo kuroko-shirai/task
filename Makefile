@@ -6,9 +6,10 @@ export SHELL := /bin/bash
 
 GOPATH := $(shell go env GOPATH)
 
-APP_PATH := sample/app
+APP_PATH := sample
 
 # Run the application
 run:
 	@echo "Running..."
-	@go run -race $(APP_PATH)/main.go
+	@go run -race $(APP_PATH)/with_recover/main.go
+#	@go run -race $(APP_PATH)/with_context/main.go
