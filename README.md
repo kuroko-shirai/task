@@ -15,13 +15,13 @@ To create a task group, it is enough to define a function
 for recovering from a panic. This can be a simple log
 message or a more complex operation to roll back to some
 state. Note that the recovery function must have the
-signature `func(recovery any)`. For example, let's log the
+signature `func(r any, args ...any)`. For example, let's log the
 panic message.
 
 ```go
 g := task.WithRecover(
-	func(recovery any) {
-		log.Println("panic:", recovery)
+	func(p any, args ...any) {
+		log.Println("panic:", p)
 	},
 )
 ```
@@ -31,12 +31,14 @@ task. Note that within the `Do` method, a function closure
 is featured.
 
 ```go
-g.Do(func() func() error {
-	return func() error {
-		...
-		return nil
-	}
-}())
+g.Do(
+	func() func() error {
+		return func() error {
+			...
+			return nil
+		}
+	}(),
+)
 ```
 
 This allows us to pass arbitrary argument lists. For
@@ -45,16 +47,18 @@ from the handler.
 
 ```go
 ch := make(chan chTask, 1)
-g.Do(func(out chan<- chTask) func() error {
-	return func() error {
-		out <- chTask{
-			State: 1,
-			Err:   nil,
+g.Do(
+	func(out chan<- chTask) func() error {
+		return func() error {
+			...
+			out <- chTask{
+				State: 1,
+			}
+			...
+			return nil
 		}
-
-		return nil
-	}
-}(ch))
+	}(ch),
+)
 ...
 g.Wait()
 res := <-ch
@@ -77,41 +81,52 @@ if err := g.Wait(); err != nil {
 }
 ```
 
-Пользователь может передавать аргументы в обработчик,
-указавая сигнатуру функтора `h` внутри метода `Do`.
+The user can pass arguments to the handler by specifying the
+signature of the functor `h` inside the `Do` method.
 
 ```go
 arg := 1
-g.Do(func(arg int) func() error {
-	return func() error {
-		...
-	}
-}(arg))
+g.Do(
+	func(arg int) func() error {
+		return func() error {
+			log.Println(arg)
+			...
+			return nil
+		}
+	}(arg),
+)
 ```
 
-Также пользователь может вызывать не предустановленные
-обработчики паники, если у вас есть появится такая
-необходимость. Это может оказаться полезным, если нужно
-перехватить конкретный момент выполнения запроса, либо
-залогировать аргументы, при которых функтор `h` дает сбой.
+Additionally, the user can invoke non-standard panic
+handlers if the need arises. This can be useful if you need
+to intercept a specific moment of the request execution, or
+log the arguments under which the functor `h` fails.
 
 ```go
-g.Do(func() func() error {
-	return func() error {
-		...
-	}
-}(), func(recovery any) {
-	log.Println("a custom handler of panic:", recovery)
-})
+arg := 1
+g.Do(
+	func(arg int) func() error {
+		return func() error {
+			log.Println("worker-2 started")
+
+			panic(errors.New("worker-2 got panic"))
+		}
+	}(arg),
+	func(arg int) func(p any, args ...any) {
+		return func(p any, args ...any) {
+			log.Println("a custom handler of panic with arg:", p, arg)
+		}
+	}(arg),
+)
 ```
 
 ### With Context
 
-Также как и в пакете `errgroup` вы можете определять
-самостоятельную работу с контекстом. Например, мы можем
-определить функцию `worker(context.Context, string) error`,
-которая запускает панику для одного обработчика, а также
-обрабатывает состояния контекста через `select`.
+Just like in the `errgroup` package, you can define your own
+context handling. For example, we can define a function
+`worker(context.Context, string) error` that triggers a
+panic for one handler, and also handles context states
+via select.
 
 ```go
 func worker(ctx context.Context, name string) error {
@@ -132,22 +147,62 @@ func worker(ctx context.Context, name string) error {
 }
 ```
 
-Как вы можете помнить, пакет `errgroup` не дает возможности
-сохранить состояние всех ошибок, завершая работу группы при
-наличии проблемы. Пакет `task` позволяет сохраняет состояния
-ошибок обработчиков и даже при возникновении паники
-позволяет пользователю определить сценарии восстановления
-системы без завершения работы микросервиса. Чтобы подключить
-контекст создайте группу задач с сценарием восстановления.
+As you may recall, the `errgroup` package does not provide
+the ability to save the state of all errors, terminating the
+group's work in case of a problem. The `task` package saves
+the error states of handlers and even in the event of a
+panic, allows the user to define system recovery scenarios
+without terminating the microservice. To connect the
+context, create a task group with a recovery scenario.
 
 ```go
 ctx, cancel := context.WithCancel(context.Background())
 g, ctx := task.WithContext(
 	ctx,
-	func(recovery any) {
-		log.Println("panic:", recovery)
+	func(p any, args ...any) {
+		log.Println("panic:", p)
 	},
 )
 ```
 
-Затем
+Then the user can add to the task group.
+
+```go
+for i := 1; i <= 3; i++ {
+	g.Do(
+		func(ctx context.Context) func() error {
+			return func() error {
+				return worker(ctx, fmt.Sprintf("worker-%d", i))
+			}
+		}(ctx),
+	)
+}
+```
+
+To create a situation where the context is cancelled, we
+will place a pause before waiting for the task group to
+finish.
+
+```go
+time.AfterFunc(1*time.Second, func() {
+	cancel()
+})
+
+if err := g.Wait(); err != nil {
+	log.Println("error:", err)
+}
+```
+
+When executing the code, we will get the following messages,
+demonstrating the panic handling and context cancellation
+for a pair of handlers.
+
+```
+2024/11/29 14:06:03 worker-2 started
+2024/11/29 14:06:03 panic: worker-2 got panic
+2024/11/29 14:06:03 worker-3 started
+2024/11/29 14:06:03 worker-1 started
+2024/11/29 14:06:04 worker worker-3 stopped by context
+2024/11/29 14:06:04 worker worker-1 stopped by context
+2024/11/29 14:06:04 error: worker-2 got panic
+```

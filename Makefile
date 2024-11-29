@@ -12,4 +12,4 @@ APP_PATH := sample
 run:
 	@echo "Running..."
 	@go run -race $(APP_PATH)/with_recover/main.go
-#	@go run -race $(APP_PATH)/with_context/main.go
+	@go run -race $(APP_PATH)/with_context/main.go

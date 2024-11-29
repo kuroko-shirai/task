@@ -13,19 +13,19 @@ type withRecover struct {
 	errOnce sync.Once
 	err     error
 
-	recover recoverFunc
+	recover rT
 }
 
-func WithRecover(recover recoverFunc) *withRecover {
+func WithRecover(recover rT) *withRecover {
 	return &withRecover{
 		recover: recover,
 	}
 }
 
-func (g *withRecover) Do(h func() error, s ...func(f any, args ...any)) {
+func (g *withRecover) Do(h hT, rs ...rT) {
 	cr := g.recover
-	if s != nil {
-		cr = s[0]
+	if rs != nil {
+		cr = rs[0]
 	}
 
 	g.wg.Add(1)
@@ -48,7 +48,6 @@ func (g *withRecover) Do(h func() error, s ...func(f any, args ...any)) {
 			g.errOnce.Do(func() {
 				g.err = errors.Join(g.err, err)
 			})
-
 		}
 	}()
 }

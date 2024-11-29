@@ -14,15 +14,13 @@ type withContext struct {
 	errOnce sync.Once
 	err     error
 
-	recover  recoverFunc
-	canceler cancelerFunc
-
-	mu sync.Mutex
+	recover  rT
+	canceler cT
 }
 
 func WithContext(
 	ctx context.Context,
-	recover recoverFunc,
+	recover rT,
 ) (*withContext, context.Context) {
 	ctx, canceler := withCancelCause(ctx)
 
@@ -38,18 +36,10 @@ func withCancelCause(
 	return context.WithCancelCause(parent)
 }
 
-func (g *withContext) Wait() error {
-	g.wg.Wait()
-	if g.canceler != nil {
-		g.canceler(g.err)
-	}
-	return g.err
-}
-
-func (g *withContext) Do(h func() error, r ...func(f any, args ...any)) {
+func (g *withContext) Do(h hT, rs ...rT) {
 	cr := g.recover
-	if r != nil {
-		cr = r[0]
+	if rs != nil {
+		cr = rs[0]
 	}
 
 	if g.sem != nil {
@@ -65,22 +55,16 @@ func (g *withContext) Do(h func() error, r ...func(f any, args ...any)) {
 			if r := recover(); r != nil {
 				cr(r)
 
-				str, _ := r.(error)
-
-				g.mu.Lock()
-				g.err = errors.Join(g.err, str)
-				g.mu.Unlock()
+				g.errOnce.Do(func() {
+					str, _ := r.(error)
+					g.err = errors.Join(g.err, str)
+				})
 			}
 		}()
 
 		if err := h(); err != nil {
 			g.errOnce.Do(func() {
-				g.mu.Lock()
 				g.err = errors.Join(g.err, err)
-				g.mu.Unlock()
-				if g.canceler != nil {
-					g.canceler(g.err)
-				}
 			})
 		}
 	}()
@@ -91,4 +75,13 @@ func (g *withContext) done() {
 		<-g.sem
 	}
 	g.wg.Done()
+}
+
+func (g *withContext) Wait() error {
+	g.wg.Wait()
+	if g.canceler != nil {
+		g.canceler(g.err)
+	}
+
+	return g.err
 }

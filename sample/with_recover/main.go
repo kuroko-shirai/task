@@ -14,24 +14,26 @@ type chTask struct {
 
 func main() {
 	g := task.WithRecover(
-		func(recovery any, args ...any) {
-			log.Println("a common handler of panic:", recovery)
+		func(r any, args ...any) {
+			log.Println("a common handler of panic:", r)
 		},
 	)
 
 	ch := make(chan chTask, 1)
-	g.Do(func(out chan<- chTask) func() error {
-		return func() error {
-			log.Println("worker-1 started")
+	g.Do(
+		func(out chan<- chTask) func() error {
+			return func() error {
+				log.Println("worker-1 started")
 
-			out <- chTask{
-				State: 1,
-				Err:   nil,
+				out <- chTask{
+					State: 1,
+					Err:   nil,
+				}
+
+				return nil
 			}
-
-			return nil
-		}
-	}(ch))
+		}(ch),
+	)
 
 	arg2 := 1
 	g.Do(
@@ -49,25 +51,29 @@ func main() {
 		}(arg2),
 	)
 
-	g.Do(func() func() error {
-		return func() error {
-			log.Println("worker-3 started")
+	g.Do(
+		func() func() error {
+			return func() error {
+				log.Println("worker-3 started")
 
-			panic(errors.New("worker-3 got panic"))
-		}
-	}())
+				panic(errors.New("worker-3 got panic"))
+			}
+		}(),
+	)
 
 	arg := 1
-	g.Do(func(arg int) func() error {
-		return func() error {
-			log.Println("worker-4 started with arg =", arg)
+	g.Do(
+		func(arg int) func() error {
+			return func() error {
+				log.Println("worker-4 started with arg =", arg)
 
-			return errors.New("worker-4 got error")
-		}
-	}(arg))
+				return errors.New("worker-4 got error")
+			}
+		}(arg),
+	)
 
 	if err := g.Wait(); err != nil {
-		log.Println("something wrong in first batch:\n", err.Error())
+		log.Printf("something wrong in first batch:\n%s", err.Error())
 	}
 
 	log.Println("ch:", <-ch)

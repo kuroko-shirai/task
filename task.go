@@ -2,8 +2,11 @@ package task
 
 type token struct{}
 
-type handlerFunc func() error
+// hT - type used by handler
+type hT func() error
 
-type recoverFunc func(f any, args ...any)
+// rt - type used by recover
+type rT func(f any, args ...any)
 
-type cancelerFunc func(error)
+// cT - type used by canceler
+type cT func(error)
