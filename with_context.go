@@ -22,7 +22,7 @@ type withContext struct {
 func WithContext(
 	ctx context.Context,
 	recover rT,
-) (*withContext, context.Context) {
+) (Task, context.Context) {
 	ctx, canceler := withCancelCause(ctx)
 
 	return &withContext{

@@ -17,7 +17,7 @@ type withRecover struct {
 	mu sync.Mutex
 }
 
-func WithRecover(recover rT) *withRecover {
+func WithRecover(recover rT) Task {
 	return &withRecover{
 		recover: recover,
 		mu:      sync.Mutex{},
