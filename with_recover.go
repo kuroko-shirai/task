@@ -24,55 +24,55 @@ func WithRecover(recover rT) Task {
 	}
 }
 
-func (g *withRecover) Do(h hT, rs ...rT) {
-	cr := g.recover
+func (it *withRecover) Do(h hT, rs ...rT) {
+	cr := it.recover
 	if rs != nil {
 		cr = rs[0]
 	}
 
-	g.wg.Add(1)
+	it.wg.Add(1)
 	go func() {
 		defer func() {
 
-			g.done()
+			it.done()
 
 			if r := recover(); r != nil {
 				cr(r)
 
 				str, _ := r.(error)
-				g.lock(func() {
-					g.err = errors.Join(g.err, str)
+				it.lock(func() {
+					it.err = errors.Join(it.err, str)
 				})
 			}
 		}()
 
 		if err := h(); err != nil {
-			g.lock(func() {
-				g.err = errors.Join(g.err, err)
+			it.lock(func() {
+				it.err = errors.Join(it.err, err)
 			})
 		}
 	}()
 }
 
-func (g *withRecover) done() {
-	if g.sem != nil {
-		<-g.sem
+func (it *withRecover) done() {
+	if it.sem != nil {
+		<-it.sem
 	}
-	g.wg.Done()
+	it.wg.Done()
 }
 
-func (g *withRecover) Wait() error {
-	g.wg.Wait()
+func (it *withRecover) Wait() error {
+	it.wg.Wait()
 
-	g.mu.Lock()
-	err := g.err
-	g.mu.Unlock()
+	it.mu.Lock()
+	err := it.err
+	it.mu.Unlock()
 
 	return err
 }
 
-func (g *withRecover) lock(f func()) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+func (it *withRecover) lock(f func()) {
+	it.mu.Lock()
+	defer it.mu.Unlock()
 	f()
 }

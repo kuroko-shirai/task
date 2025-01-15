@@ -38,58 +38,59 @@ func withCancelCause(
 	return context.WithCancelCause(parent)
 }
 
-func (g *withContext) Do(h hT, rs ...rT) {
-	cr := g.recover
+func (it *withContext) Do(h hT, rs ...rT) {
+	cr := it.recover
 	if rs != nil {
 		cr = rs[0]
 	}
 
-	if g.sem != nil {
-		g.sem <- token{}
+	if it.sem != nil {
+		it.sem <- token{}
 	}
 
-	g.wg.Add(1)
+	it.wg.Add(1)
 	go func() {
 		defer func() {
 
-			g.done()
+			it.done()
 
 			if r := recover(); r != nil {
 				cr(r)
 
 				str, _ := r.(error)
-				g.lock(func() {
-					g.err = errors.Join(g.err, str)
+				it.lock(func() {
+					it.err = errors.Join(it.err, str)
 				})
 			}
 		}()
 
 		if err := h(); err != nil {
-			g.lock(func() {
-				g.err = errors.Join(g.err, err)
+			it.lock(func() {
+				it.err = errors.Join(it.err, err)
 			})
 		}
 	}()
 }
 
-func (g *withContext) done() {
-	if g.sem != nil {
-		<-g.sem
-	}
-	g.wg.Done()
-}
-
-func (g *withContext) Wait() error {
-	g.wg.Wait()
-	if g.canceler != nil {
-		g.canceler(g.err)
+func (it *withContext) done() {
+	if it.sem != nil {
+		<-it.sem
 	}
 
-	return g.err
+	it.wg.Done()
 }
 
-func (g *withContext) lock(f func()) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+func (it *withContext) Wait() error {
+	it.wg.Wait()
+	if it.canceler != nil {
+		it.canceler(it.err)
+	}
+
+	return it.err
+}
+
+func (it *withContext) lock(f func()) {
+	it.mu.Lock()
+	defer it.mu.Unlock()
 	f()
 }
