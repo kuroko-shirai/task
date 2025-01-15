@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	wp := task.NewWorkerPool(3, func() func(f any, args ...any) {
+	wp := task.WorkerPool(3, func() func(f any, args ...any) {
 		return func(p any, args ...any) {
 			log.Println("a common handler of panic with arg:", p)
 		}
@@ -30,5 +30,7 @@ func main() {
 		)
 	}
 
-	wp.Start()
+	if err := wp.Start(); err != nil {
+		log.Println("error", err)
+	}
 }

@@ -12,19 +12,19 @@ type withRecover struct {
 
 	err error
 
-	recover rT
+	recover RecoverType
 
 	mu sync.Mutex
 }
 
-func WithRecover(recover rT) Task {
+func WithRecover(recover RecoverType) Task {
 	return &withRecover{
 		recover: recover,
 		mu:      sync.Mutex{},
 	}
 }
 
-func (it *withRecover) Do(h hT, rs ...rT) {
+func (it *withRecover) Do(h HandlerType, rs ...RecoverType) {
 	cr := it.recover
 	if rs != nil {
 		cr = rs[0]

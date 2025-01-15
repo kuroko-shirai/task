@@ -13,22 +13,22 @@ type withContext struct {
 
 	err error
 
-	recover  rT
-	canceler cT
+	recover   RecoverType
+	canceller CancellerType
 
 	mu sync.Mutex
 }
 
 func WithContext(
 	ctx context.Context,
-	recover rT,
+	recover RecoverType,
 ) (Task, context.Context) {
-	ctx, canceler := withCancelCause(ctx)
+	ctx, canceller := withCancelCause(ctx)
 
 	return &withContext{
-		recover:  recover,
-		canceler: canceler,
-		mu:       sync.Mutex{},
+		recover:   recover,
+		canceller: canceller,
+		mu:        sync.Mutex{},
 	}, ctx
 }
 
@@ -38,7 +38,7 @@ func withCancelCause(
 	return context.WithCancelCause(parent)
 }
 
-func (it *withContext) Do(h hT, rs ...rT) {
+func (it *withContext) Do(h HandlerType, rs ...RecoverType) {
 	cr := it.recover
 	if rs != nil {
 		cr = rs[0]
@@ -82,8 +82,8 @@ func (it *withContext) done() {
 
 func (it *withContext) Wait() error {
 	it.wg.Wait()
-	if it.canceler != nil {
-		it.canceler(it.err)
+	if it.canceller != nil {
+		it.canceller(it.err)
 	}
 
 	return it.err

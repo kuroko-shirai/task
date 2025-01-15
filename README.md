@@ -206,3 +206,49 @@ for a pair of handlers.
 2024/11/29 14:06:04 worker worker-1 stopped by context
 2024/11/29 14:06:04 error: worker-2 got panic
 ```
+
+### Worker Pool
+
+To create a pool of worker processes, the `WorkerPool` 
+function is used. It takes two arguments: the number of 
+worker processes and a panic handler function.
+
+```go
+wp := task.WorkerPool(3, func() func(f any, args ...any) {
+    return func(p any, args ...any) {
+        log.Println("a common handler of panic with arg:", p)
+    }
+}())
+```
+
+To submit jobs to the pool, the `SubmitJob` function is 
+used. It takes a task function and a panic handler function.
+
+```go
+wp.SubmitJob(
+    func(arg int) func() error {
+        return func() error {
+            log.Printf("job %d started", arg)
+
+            return nil
+        }
+    }(i),
+    func(arg int) func(f any, args ...any) {
+        return func(p any, args ...any) {
+            log.Println("a custom handler of panic with arg:", p, arg)
+        }
+    }(i),
+)
+```
+
+To start the pool, the `Start` function is used. It executes 
+all tasks in the pool and returns an error if one occurs.
+
+```go
+if err := wp.Start(); err != nil {
+    log.Println("error", err)
+}
+```
+
+An example of using the `task` package can be found in the 
+`sample/wp/main.go` file in this repository.
