@@ -33,7 +33,6 @@ func (it *withRecover) Do(h HandlerType, rs ...RecoverType) {
 	it.wg.Add(1)
 	go func() {
 		defer func() {
-
 			it.done()
 
 			if r := recover(); r != nil {
