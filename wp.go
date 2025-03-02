@@ -14,7 +14,7 @@ type worker struct {
 	js []job
 }
 
-type workerPool struct {
+type WorkerPool struct {
 	ws []worker
 	wg *sync.WaitGroup
 
@@ -28,7 +28,7 @@ func newWorker(r RecoverType) *worker {
 	}
 }
 
-func WorkerPool(num int, rs ...RecoverType) *workerPool {
+func NewWorkerPool(num int, rs ...RecoverType) *WorkerPool {
 	ws := make([]worker, 0, num)
 
 	var r RecoverType
@@ -40,7 +40,7 @@ func WorkerPool(num int, rs ...RecoverType) *workerPool {
 		ws = append(ws, *newWorker(r))
 	}
 
-	return &workerPool{
+	return &WorkerPool{
 		ws:  ws,
 		wg:  &sync.WaitGroup{},
 		idx: 0,
@@ -48,7 +48,7 @@ func WorkerPool(num int, rs ...RecoverType) *workerPool {
 	}
 }
 
-func (it *workerPool) SubmitJob(h HandlerType, rs ...RecoverType) {
+func (it *WorkerPool) SubmitJob(h HandlerType, rs ...RecoverType) {
 	if it.idx == it.num {
 		it.idx = 0
 	}
@@ -64,7 +64,7 @@ func (it *workerPool) SubmitJob(h HandlerType, rs ...RecoverType) {
 	it.idx++
 }
 
-func (it *workerPool) Start() error {
+func (it *WorkerPool) Start() error {
 	var es error
 
 	for _, w := range it.ws {
